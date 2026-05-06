@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SQL Gen — Natural Language to SQL</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #181818;
+      --surface2: #222222;
+      --border: #2a2a2a;
+      --border2: #383838;
+      --text: #f0f0f0;
+      --text2: #888;
+      --text3: #555;
+      --accent: #4ade80;
+      --accent-dim: rgba(74, 222, 128, 0.1);
+      --accent-border: rgba(74, 222, 128, 0.25);
+      --danger: #f87171;
+      --danger-dim: rgba(248, 113, 113, 0.1);
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .status-pill {
+      font-size: 0.7rem;
+      font-family: var(--mono);
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--accent-border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-pill::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    main {
+      flex: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .hero {
+      text-align: center;
+      padding-bottom: 1rem;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero h1 span { color: var(--accent); }
+
+    .hero p {
+      font-size: 0.9rem;
+      color: var(--text2);
+      font-family: var(--mono);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-header-title {
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 0.875rem 1rem;
+      font-size: 0.85rem;
+      font-family: var(--mono);
+      color: var(--text3);
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .tab:hover { color: var(--text2); }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-panel { display: none; padding: 1.25rem; }
+    .tab-panel.active { display: block; }
+
+    .dropzone {
+      border: 1.5px dashed var(--border2);
+      border-radius: 8px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .dropzone svg { opacity: 0.4; }
+
+    .dropzone-title {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .dropzone-sub {
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--text3);
+    }
+
+    .file-info {
+      display: none;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface2);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .file-info-name {
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      font-size: 0.7rem;
+      font-family: var(--mono);
+      padding: 3px 10px;
+      border-radius: 99px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      color: var(--text2);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 1rem;
+    }
+
+    .form-group:last-child { margin-bottom: 0; }
+
+    label {
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    input[type="text"], textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.875rem;
+      font-family: var(--mono);
+      color: var(--text);
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="text"]::placeholder, textarea::placeholder {
+      color: var(--text3);
+    }
+
+    .question-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .question-row input { flex: 1; }
+
+    .btn-generate {
+      padding: 10px 20px;
+      background: var(--accent);
+      color: #0f0f0f;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: var(--sans);
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+
+    .btn-generate:hover { opacity: 0.85; }
+    .btn-generate:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .result-card {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .result-header {
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .result-label {
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .btn-copy {
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-copy:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .sql-output {
+      padding: 1.25rem;
+      font-family: var(--mono);
+      font-size: 0.875rem;
+      color: var(--accent);
+      white-space: pre-wrap;
+      line-height: 1.7;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      color: var(--text3);
+    }
+
+    .loading::after {
+      content: '';
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0% { content: '.'; }
+      33% { content: '..'; }
+      66% { content: '...'; }
+    }
+
+    .error-box {
+      display: none;
+      padding: 0.875rem 1.25rem;
+      background: var(--danger-dim);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-family: var(--mono);
+      color: var(--danger);
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--text3);
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">sql<span>gen</span></div>
+  <div class="status-pill">API live</div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Natural language<br/>to <span>SQL</span></h1>
+    <p>powered by gemma-1b fine-tuned model</p>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('upload')">Upload CSV / Excel</button>
+      <button class="tab" onclick="switchTab('manual')">Manual schema</button>
+    </div>
+
+    <div id="panel-upload" class="tab-panel active">
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="handleDrop(event)">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="dropzone-title">Drop your file here</div>
+        <div class="dropzone-sub">CSV or Excel (.xlsx) — columns auto-detected</div>
+        <input type="file" id="fileInput" accept=".csv,.xlsx" style="display:none" onchange="handleFile(this)"/>
+      </div>
+      <div class="file-info" id="file-info">
+        <div class="file-info-name" id="file-name"></div>
+        <div class="chips" id="col-chips"></div>
+      </div>
+    </div>
+
+    <div id="panel-manual" class="tab-panel">
+      <div class="form-group">
+        <label>Table name</label>
+        <input type="text" id="table-name" placeholder="e.g. employees"/>
+      </div>
+      <div class="form-group">
+        <label>Columns (comma separated)</label>
+        <input type="text" id="col-manual" placeholder="e.g. id, name, salary, department" oninput="updateManualChips()"/>
+      </div>
+      <div class="chips" id="manual-chips" style="margin-top:4px;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-title">Ask in plain English</div>
+    </div>
+    <div style="padding:1.25rem;">
+      <div class="question-row">
+        <input type="text" id="question" placeholder="e.g. Get all employees with salary greater than 50000" onkeydown="if(event.key==='Enter')generateSQL()"/>
+        <button class="btn-generate" id="gen-btn" onclick="generateSQL()">Generate →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">Generating SQL</div>
+  <div class="error-box" id="error-box"></div>
+
+  <div class="result-card" id="result-card">
+    <div class="result-header">
+      <div class="result-label">Generated SQL</div>
+      <button class="btn-copy" id="copy-btn" onclick="copySQL()">Copy</button>
+    </div>
+    <div class="sql-output" id="sql-output"></div>
+  </div>
+
+</main>
+
+<footer>sqlgen · gemma-1b fine-tuned · azure + hugging face</footer>
+
+<script>
+  const API_URL = "https://sql-gen-backend.bravetree-cce96179.centralindia.azurecontainerapps.io";
+  let currentTab = 'upload';
+  let detectedColumns = [];
+  let detectedTable = 'table';
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'upload') || (i === 1 && tab === 'manual'));
+    });
+    document.getElementById('panel-upload').classList.toggle('active', tab === 'upload');
+    document.getElementById('panel-manual').classList.toggle('active', tab === 'manual');
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropzone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  }
+
+  function handleFile(input) {
+    if (input.files[0]) processFile(input.files[0]);
+  }
+
+  function processFile(file) {
+    document.getElementById('file-name').textContent = file.name;
+    detectedTable = file.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_').toLowerCase();
+
+    if (file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const firstLine = e.target.result.split('\n')[0];
+        detectedColumns = firstLine.split(',').map(c => c.trim().replace(/"/g, ''));
+        showChips(detectedColumns, 'col-chips');
+        document.getElementById('file-info').style.display = 'block';
+      };
+      reader.readAsText(file);
+    } else {
+      detectedColumns = ['id', 'name', 'value'];
+      showChips(detectedColumns, 'col-chips');
+      document.getElementById('file-info').style.display = 'block';
+    }
+  }
+
+  function showChips(cols, id) {
+    document.getElementById(id).innerHTML = cols
+      .map(c => `<span class="chip">${c}</span>`).join('');
+  }
+
+  function updateManualChips() {
+    const cols = document.getElementById('col-manual').value
+      .split(',').map(c => c.trim()).filter(Boolean);
+    detectedColumns = cols;
+    showChips(cols, 'manual-chips');
+  }
+
+  async function generateSQL() {
+    const question = document.getElementById('question').value.trim();
+    if (!question) return;
+
+    let schemaContext = null;
+    if (detectedColumns.length) {
+      const table = currentTab === 'manual'
+        ? (document.getElementById('table-name').value || 'table')
+        : detectedTable;
+      schemaContext = `${table}: ${detectedColumns.join(', ')}`;
+    }
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('result-card').style.display = 'none';
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('gen-btn').disabled = true;
+
+    try {
+      const res = await fetch(`${API_URL}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, schema_context: schemaContext })
+      });
+
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+
+      document.getElementById('sql-output').textContent = data.sql;
+      document.getElementById('result-card').style.display = 'block';
+    } catch (err) {
+      document.getElementById('error-box').textContent = `Failed: ${err.message} — check API connection`;
+      document.getElementById('error-box').style.display = 'block';
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('gen-btn').disabled = false;
+    }
+  }
+
+  function copySQL() {
+    const sql = document.getElementById('sql-output').textContent;
+    navigator.clipboard.writeText(sql).then(() => {
+      document.getElementById('copy-btn').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('copy-btn').textContent = 'Copy', 2000);
+    });
+  }
+</script>
+</body>
+</html>
